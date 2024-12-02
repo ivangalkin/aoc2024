@@ -290,7 +290,7 @@ decltype(input_real) input_test;
 auto &input = input_real;
 } // namespace
 
-int main() {
+int main01() {
   std::vector<ll> first(input.size());
   std::vector<ll> second(input.size());
   int i = 0;
