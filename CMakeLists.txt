@@ -6,8 +6,8 @@ string(APPEND CMAKE_CXX_FLAGS_RELEASE " -O3 -march=native")
 
 add_executable(aoc2024
 #        01.cpp
-        02.cpp
-#        03.cpp
+#        02.cpp
+        03.cpp
 #        04.cpp
 #        05.cpp
 #        06.cpp

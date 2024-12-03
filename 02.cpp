@@ -1087,7 +1087,7 @@ bool is_safe2(const std::vector<ll> &list) {
 
 } // namespace
 
-int main() {
+int main02() {
   int64_t result0 = 0;
   int64_t result1 = 0;
   for (const auto &list : input) {
