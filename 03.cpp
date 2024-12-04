@@ -63,7 +63,7 @@ ll perform_multiplication(std::string::const_iterator from,
 }
 } // namespace
 
-int main() {
+int main03() {
   int64_t result0 = perform_multiplication(input.cbegin(), input.cend());
   int64_t result1 = 0;
 
