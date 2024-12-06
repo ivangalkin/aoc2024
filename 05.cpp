@@ -493,7 +493,7 @@ bool my_less_predicate(ll p1, ll p2) {
 
 } // namespace
 
-int main() {
+int main05() {
   int64_t result0 = 0;
   int64_t result1 = 0;
 
