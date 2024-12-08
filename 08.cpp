@@ -164,22 +164,14 @@ struct Antennas {
           do {
             std::get<0>(antinode) += dx;
             std::get<1>(antinode) += dy;
-
-            if (!insert_antinode(antinode, result)) {
-              break;
-            }
-          } while (true);
+          } while (insert_antinode(antinode, result));
         }
         {
           auto antinode = first;
           do {
             std::get<0>(antinode) -= dx;
             std::get<1>(antinode) -= dy;
-
-            if (!insert_antinode(antinode, result)) {
-              break;
-            }
-          } while (true);
+          } while (insert_antinode(antinode, result));
         }
       }
     }
