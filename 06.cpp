@@ -380,7 +380,7 @@ struct Guard {
 };
 } // namespace
 
-int main() {
+int main06() {
   int64_t result0 = 0;
   int64_t result1 = 0;
 
