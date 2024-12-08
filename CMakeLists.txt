@@ -12,8 +12,8 @@ add_executable(aoc2024
 #        04.cpp
 #        05.cpp
 #        06.cpp
-        07.cpp
-#        08.cpp
+#        07.cpp
+        08.cpp
 #        09.cpp
 #        10.cpp
 #        11.cpp
