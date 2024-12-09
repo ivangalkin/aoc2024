@@ -167,7 +167,7 @@ struct Antennas {
           } while (insert_antinode(antinode, result));
         }
         {
-          auto antinode = first;
+          auto antinode = second;
           do {
             std::get<0>(antinode) -= dx;
             std::get<1>(antinode) -= dy;
@@ -205,7 +205,7 @@ template <bool with_harmonics> ll calc_antinodes() {
 }
 } // namespace
 
-int main() {
+int main08() {
   int64_t result0 = calc_antinodes<false>();
   int64_t result1 = calc_antinodes<true>();
 
