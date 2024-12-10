@@ -461,7 +461,7 @@ ll checksum() {
 }
 } // namespace
 
-int main() {
+int main09() {
   int64_t result0 = 0;
   int64_t result1 = 0;
 
