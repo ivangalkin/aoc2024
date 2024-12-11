@@ -134,7 +134,7 @@ struct Trail {
 };
 } // namespace
 
-int main() {
+int main10() {
   int64_t result0 = 0;
   int64_t result1 = 0;
 
