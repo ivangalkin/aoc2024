@@ -74,18 +74,18 @@ namespace {
     }
 }
 
-int main() {
-    int64_t result0 = 0;
-    int64_t result1 = 0;
+int main11() {
+  int64_t result0 = 0;
+  int64_t result1 = 0;
 
-    for (auto i : input) {
-      result0 += calculate(i, 25);
-    }
-    for (auto i : input) {
-      result1 += calculate(i, 75);
-    }
+  for (auto i : input) {
+    result0 += calculate(i, 25);
+  }
+  for (auto i : input) {
+    result1 += calculate(i, 75);
+  }
 
-    myprint(result0);
-    myprint(result1);
-    return 0;
+  myprint(result0);
+  myprint(result1);
+  return 0;
 }
