@@ -502,7 +502,7 @@ std::vector<Garden> scan() {
 
 } // namespace
 
-int main() {
+int main12() {
   int64_t result0 = 0;
   int64_t result1 = 0;
 
