@@ -254,7 +254,7 @@ std::vector<std::tuple<ll, ll>> check2(const Machine &m) {
 };
 } // namespace
 
-int main() {
+int main13() {
   int64_t result0 = 0;
   int64_t result1 = 0;
 
