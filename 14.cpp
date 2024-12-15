@@ -266,7 +266,7 @@ struct Range {
   ll _to_y;
 };
 
-int main() {
+int main14() {
   int64_t result0 = 1;
   int64_t result1 = 1;
 
