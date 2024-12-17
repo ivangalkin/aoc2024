@@ -431,7 +431,7 @@ std::tuple<ll, ll> step(std::tuple<ll, ll> r, char d) {
 }
 } // namespace
 
-int main() {
+int main15_0() {
   int64_t result0 = 0;
 
   auto r = find_robot();

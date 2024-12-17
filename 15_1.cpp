@@ -594,7 +594,7 @@ std::tuple<ll, ll> step(std::tuple<ll, ll> r, char d) {
 }
 } // namespace
 
-int main() {
+int main15_1() {
   int64_t result0 = 0;
 
   for (auto line : map) {
