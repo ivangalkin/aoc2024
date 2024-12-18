@@ -547,7 +547,7 @@ int shortestPath(const vector<pair<int, int>> adj[], int V, int src,
 
 } // namespace
 
-int main() {
+int main16() {
   int64_t result0 = 0;
   int64_t result1 = 0;
 
