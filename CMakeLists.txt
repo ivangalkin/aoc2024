@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 project(aoc2024)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 string(APPEND CMAKE_CXX_FLAGS " -Werror")
 string(APPEND CMAKE_CXX_FLAGS_RELEASE " -O3 -march=native")
 
@@ -24,8 +24,8 @@ add_executable(aoc2024
 #        15_1.cpp
 #        16.cpp
 #        17.cpp
-        18.cpp
-#        19.cpp
+#        18.cpp
+        19.cpp
 #        20.cpp
 #        21.cpp
 #        22.cpp
