@@ -3617,26 +3617,25 @@ ll get_shortest_path(ll SIZE, ll LIMIT) {
     }
   }
 
-    return shortestPath(adj, SIZE*SIZE, ID(0,0),
-                         ID(SIZE-1,SIZE-1));
+  return shortestPath(adj, SIZE * SIZE, ID(0, 0), ID(SIZE - 1, SIZE - 1));
 }
 }
 
-int main() {
+int main18() {
 
-    int64_t result0 = get_shortest_path(71, 1024);
-    std::string result1;
+  int64_t result0 = get_shortest_path(71, 1024);
+  std::string result1;
 
-    for (ll limit = 1024+1; limit < input.size(); limit++) {
-        ll path = get_shortest_path(71, limit);
-        if (path == INF) {
-            auto [x, y] = input.at(limit-1);
-            result1.append(std::to_string(x)).append(",").append(std::to_string(y));
-            break;
-        }
+  for (ll limit = 1024 + 1; limit < input.size(); limit++) {
+    ll path = get_shortest_path(71, limit);
+    if (path == INF) {
+      auto [x, y] = input.at(limit - 1);
+      result1.append(std::to_string(x)).append(",").append(std::to_string(y));
+      break;
     }
+  }
 
-    myprint(result0);
-    myprint(result1);
-    return 0;
+  myprint(result0);
+  myprint(result1);
+  return 0;
 }
