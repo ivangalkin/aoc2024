@@ -624,7 +624,7 @@ ll check_without_cache(const std::string &pattern) {
 
 } // namespace
 
-int main() {
+int main19() {
   int64_t result0 = 0;
   int64_t result1 = 0;
 
