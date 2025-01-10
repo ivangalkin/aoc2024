@@ -56,7 +56,7 @@ std::map<std::string, std::optional<ll>> data_real{
 
 enum OP { AND, OR, XOR };
 
-static const auto op_to_string = [](OP op) {
+static const char *op_to_string(OP op) {
   switch (op) {
   case AND:
     return "AND";
@@ -70,26 +70,29 @@ static const auto op_to_string = [](OP op) {
 
 struct Gate {
   Gate(std::string input0, OP op, std::string input1, std::string output)
-      : _op{op},
-        _inputs{
-            {input0, std::nullopt},
-            {input1, std::nullopt},
-        },
-        _output{{output, std::nullopt}} {}
+      : _op{op}, _inputs{{
+                     {input0, std::nullopt},
+                     {input1, std::nullopt},
+                 }},
+        _output{output, std::nullopt} {}
 
   bool calculate() {
-    auto [key0, value0] = *_inputs.begin();
-    auto [key1, value1] = *std::next(_inputs.begin());
+    if (auto output = _output.second) {
+      return true;
+    }
+    auto &[key0, value0] = _inputs.at(0);
+    auto &[key1, value1] = _inputs.at(1);
+
     if (value0 && value1) {
       switch (_op) {
       case AND:
-        _output.begin()->second = *value0 & *value1;
+        _output.second = *value0 & *value1;
         break;
       case OR:
-        _output.begin()->second = *value0 | *value1;
+        _output.second = *value0 | *value1;
         break;
       case XOR:
-        _output.begin()->second = *value0 ^ *value1;
+        _output.second = *value0 ^ *value1;
         break;
       }
       return true;
@@ -97,28 +100,32 @@ struct Gate {
     return false;
   }
 
-  const auto &getOutput() { return *_output.begin(); }
+  const auto &getOutput() { return _output; }
 
   std::string print() const {
     return (std::ostringstream()
-            << "{" << _inputs.begin()->first << " " << op_to_string(_op) << " "
-            << std::next(_inputs.begin())->first << " -> "
-            << _output.begin()->first << "}")
+            << "{" << _inputs.at(0).first << " " << op_to_string(_op) << " "
+            << _inputs.at(1).first << " -> " << _output.first << "}")
         .str();
   }
 
   void setInput(const std::tuple<std::string, std::optional<ll>> &value) {
+    if (_output.second) {
+      return;
+    }
     auto &[k, v] = value;
-    if (auto it = _inputs.find(k); it != _inputs.end()) {
-      it->second = v;
+    if (_inputs.at(0).first == k) {
+      _inputs.at(0).second = v;
+    } else if (_inputs.at(1).first == k) {
+      _inputs.at(1).second = v;
     }
   }
 
   auto operator<=>(const Gate &) const = default;
 
   OP _op;
-  std::map<std::string, std::optional<ll>> _inputs;
-  std::map<std::string, std::optional<ll>> _output;
+  std::array<std::pair<std::string, std::optional<ll>>, 2> _inputs;
+  std::pair<std::string, std::optional<ll>> _output;
 };
 
 const std::vector<Gate> original_gates{
@@ -241,6 +248,13 @@ constexpr ll OUTPUT_SIZE = INPUT_SIZE + 1;
 
 using ull = unsigned ll;
 
+std::string getID(char c, int nr) {
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+  char buffer[4]{};
+  snprintf(buffer, sizeof(buffer), "%c%02d", c, nr);
+  return buffer;
+}
+
 struct Context {
   std::vector<Gate> _gates;
   std::map<std::string, Gate> _output_map;
@@ -255,7 +269,7 @@ struct Context {
 
     for (auto &gate : _gates) {
       auto [it, inserted] =
-          _output_map.insert(std::make_pair(gate._output.begin()->first, gate));
+          _output_map.insert(std::make_pair(gate._output.first, gate));
       assert(inserted);
     }
   }
@@ -265,20 +279,16 @@ struct Context {
 
     std::map<std::string, std::optional<ll>> data_ready;
     for (auto i = 0; i < INPUT_SIZE; i++) {
-      std::ostringstream ss;
-      ss << "x" << std::setw(2) << std::setfill('0') << i;
-      data_ready[ss.str()] = x[i];
+      data_ready[getID('x', i)] = x[i];
     }
     for (auto i = 0; i < INPUT_SIZE; i++) {
-      std::ostringstream ss;
-      ss << "y" << std::setw(2) << std::setfill('0') << i;
-      data_ready[ss.str()] = y[i];
+      data_ready[getID('y', i)] = y[i];
     }
 
     for (auto &gate : _gates) {
-      gate._inputs.begin()->second = std::nullopt;
-      std::next(gate._inputs.begin())->second = std::nullopt;
-      gate._output.begin()->second = std::nullopt;
+      gate._inputs.at(0).second = std::nullopt;
+      gate._inputs.at(1).second = std::nullopt;
+      gate._output.second = std::nullopt;
     }
 
     // for (auto& [key, value]: data_ready) {
@@ -303,7 +313,7 @@ struct Context {
           auto &output = gate.getOutput();
           new_data_ready.insert(output);
           if (output.first.starts_with("z")) {
-            Zs.at(strtol(output.first.c_str() + 1, nullptr, 10)) =
+            Zs.at(strtol(output.first.data() + 1, nullptr, 10)) =
                 *(output.second);
           }
         }
@@ -343,20 +353,13 @@ struct Context {
       auto gate_id = std::to_string((uintptr_t)&gate);
       std::cout << gate_id << "[label = " << op_to_string(gate._op)
                 << ", shape = box];" << std::endl;
-      std::cout << gate._inputs.begin()->first << " -- " << gate_id << ";"
+      std::cout << gate._inputs.at(0).first << " -- " << gate_id << ";"
                 << std::endl;
-      std::cout << std::next(gate._inputs.begin())->first << " -- " << gate_id
-                << ";" << std::endl;
-      std::cout << gate_id << " -- " << gate._output.begin()->first << ";"
+      std::cout << gate._inputs.at(1).first << " -- " << gate_id << ";"
                 << std::endl;
+      std::cout << gate_id << " -- " << gate._output.first << ";" << std::endl;
     }
     std::cout << "}" << std::endl;
-
-    // for (auto *gate : _Zs) {
-    //   if (gate->_op != XOR)
-    //     std::cout << gate->_output.begin()->first << " "
-    //               << op_to_string(gate->_op) << std::endl;
-    // }
   }
 
   std::set<Gate> get_involved_gates(const std::string &output) const {
@@ -372,10 +375,10 @@ struct Context {
         continue;
       }
       auto current_gate = current_it->second;
-      involved_gates.insert(current_gate);
+      auto input0 = current_gate._inputs.at(0).first;
+      auto input1 = current_gate._inputs.at(1).first;
 
-      auto input0 = current_gate._inputs.begin()->first;
-      auto input1 = std::next(current_gate._inputs.begin())->first;
+      involved_gates.insert(std::move(current_gate));
 
       queue.push_back(std::move(input0));
       queue.push_back(std::move(input1));
@@ -394,9 +397,9 @@ struct Context {
 
     Gate *other_g1 = nullptr, *other_g2 = nullptr;
     for (auto &other : new_context._gates) {
-      if (other._output.begin()->first == o1) {
+      if (other._output.first == o1) {
         other_g1 = &other;
-      } else if (other._output.begin()->first == o2) {
+      } else if (other._output.first == o2) {
         other_g2 = &other;
       }
       if (other_g1 && other_g2)
@@ -407,8 +410,8 @@ struct Context {
       assert(false);
     }
 
-    other_g1->_output = {{o2, std::nullopt}};
-    other_g2->_output = {{o1, std::nullopt}};
+    other_g1->_output = {o2, std::nullopt};
+    other_g2->_output = {o1, std::nullopt};
 
     new_context.init();
     return new_context;
@@ -460,10 +463,10 @@ struct Context {
         [i, this]() { return check(i, false, true, 1); },
         [i, this]() { return check(i, true, false, 1); },
         [i, this]() { return check(i, true, true, 1); },
-        [i, this]() { return check(i, false, false, 2); },
-        [i, this]() { return check(i, false, true, 2); },
-        [i, this]() { return check(i, true, false, 2); },
-        [i, this]() { return check(i, true, true, 2); },
+        // [i, this]() { return check(i, false, false, 2); },
+        // [i, this]() { return check(i, false, true, 2); },
+        // [i, this]() { return check(i, true, false, 2); },
+        // [i, this]() { return check(i, true, true, 2); },
 
     };
     return std::all_of(checks.begin(), checks.end(),
@@ -523,7 +526,7 @@ int main() {
   std::vector<Context> queue = {ctx};
 
   // This is a a DFS with some heuristics. It checks the gates only in a close
-  // range and awoids already validates gates. However it's still very slow. One
+  // range and avoids already validates gates. Runtime is around 1 minute. One
   // of the improvements might be to start with the gates which
   // 1. Output "zxx" & are not the last gate (?)
   // 2. Have anything but XOR in it
@@ -538,14 +541,12 @@ int main() {
     }
 
     for (ull i = context._correct_bit; i < INPUT_SIZE; i++) {
-      std::set<Gate> involved_gates_i = context.get_involved_gates(
-          (std::ostringstream()
-           << "z" << std::setw(2) << std::setfill('0') << (int)i)
-              .str());
-
-      if (context.check_0_i(i)) {
-        context._correct_gates.insert(involved_gates_i.begin(),
-                                      involved_gates_i.end());
+      std::set<Gate> involved_gates_i =
+          context.get_involved_gates(getID('z', i));
+      if (context.check_i(i)) {
+        context._correct_gates.insert(
+            std::make_move_iterator(involved_gates_i.begin()),
+            std::make_move_iterator(involved_gates_i.end()));
 
         if (i == INPUT_SIZE - 1) {
           std::cout << "FINISH!!!!!" << std::endl;
@@ -561,24 +562,19 @@ int main() {
         ll min = std::max<ll>(0, i);
         ll max = std::min<ll>(OUTPUT_SIZE - 1, i + 3);
         for (auto j = min; j != max; j++) {
-          auto involved_gates_im1 = context.get_involved_gates(
-              (std::ostringstream()
-               << "z" << std::setw(2) << std::setfill('0') << (int)j)
-                  .str());
-          involved_gates_all.insert(involved_gates_im1.begin(),
-                                    involved_gates_im1.end());
+          auto involved_gates_im1 = context.get_involved_gates(getID('z', j));
+          involved_gates_all.insert(
+              std::make_move_iterator(involved_gates_im1.begin()),
+              std::make_move_iterator(involved_gates_im1.end()));
         }
 
-        std::set<Gate> questionable_gates_set;
+        std::vector<Gate> questionable_gates;
 
         std::set_difference(
             involved_gates_all.begin(), involved_gates_all.end(),
             context._correct_gates.begin(), context._correct_gates.end(),
-            std::inserter(questionable_gates_set,
-                          questionable_gates_set.end()));
+            std::back_inserter(questionable_gates));
 
-        std::vector<Gate> questionable_gates(questionable_gates_set.begin(),
-                                             questionable_gates_set.end());
         for (auto &g : questionable_gates) {
           std::cout << g.print() << " ";
         }
@@ -588,29 +584,28 @@ int main() {
           for (ll g2i = g1i + 1; g2i < questionable_gates.size(); g2i++) {
             auto &g1 = questionable_gates.at(g1i);
             auto &g2 = questionable_gates.at(g2i);
-            std::cout << "swap " << g1.print() << " " << g2.print();
+            // std::cout << "swap " << g1.print() << " " << g2.print();
+            // if (!context._swaps.empty()) {
+            //   std::cout << " existing swaps ";
+            //   context.print_swaps();
+            // } else {
+            //   std::cout << std::endl;
+            // }
 
-            if (!context._swaps.empty()) {
-              std::cout << " existing swaps ";
-              context.print_swaps();
-            } else {
-              std::cout << std::endl;
-            }
-            auto o1 = g1._output.begin()->first;
-            auto o2 = g2._output.begin()->first;
+            const auto &o1 = g1._output.first;
+            const auto &o2 = g2._output.first;
             auto new_context = context.swap_outputs(o1, o2);
 
-            if (new_context.check_0_i(i)) {
+            if (new_context.check_i(i)) {
               std::cout << "successfull swap " << g1.print() << " "
                         << g2.print() << std::endl;
               new_context._correct_bit = i;
               for (auto j = 0; j <= i; j++) {
-                auto involved_gates_im1 = new_context.get_involved_gates(
-                    (std::ostringstream()
-                     << "z" << std::setw(2) << std::setfill('0') << (int)j)
-                        .str());
-                new_context._correct_gates.insert(involved_gates_im1.begin(),
-                                                  involved_gates_im1.end());
+                auto involved_gates_im1 =
+                    new_context.get_involved_gates(getID('z', j));
+                new_context._correct_gates.insert(
+                    std::make_move_iterator(involved_gates_im1.begin()),
+                    std::make_move_iterator(involved_gates_im1.end()));
               }
               queue.push_back(std::move(new_context));
             }
