@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -55,6 +56,18 @@ std::map<std::string, std::optional<ll>> data_real{
 
 enum OP { AND, OR, XOR };
 
+static const auto op_to_string = [](OP op) {
+  switch (op) {
+  case AND:
+    return "AND";
+  case OR:
+    return "OR";
+  case XOR:
+    return "XOR";
+  }
+  assert(false);
+};
+
 struct Gate {
   Gate(std::string input0, OP op, std::string input1, std::string output)
       : _op{op},
@@ -86,6 +99,14 @@ struct Gate {
 
   const auto &getOutput() { return *_output.begin(); }
 
+  std::string print() const {
+    return (std::ostringstream()
+            << "{" << _inputs.begin()->first << " " << op_to_string(_op) << " "
+            << std::next(_inputs.begin())->first << " -> "
+            << _output.begin()->first << "}")
+        .str();
+  }
+
   void setInput(const std::tuple<std::string, std::optional<ll>> &value) {
     auto &[k, v] = value;
     if (auto it = _inputs.find(k); it != _inputs.end()) {
@@ -93,12 +114,14 @@ struct Gate {
     }
   }
 
+  auto operator<=>(const Gate &) const = default;
+
   OP _op;
   std::map<std::string, std::optional<ll>> _inputs;
   std::map<std::string, std::optional<ll>> _output;
 };
 
-std::vector<Gate> gates{
+const std::vector<Gate> original_gates{
 
     {"mrh", XOR, "bnc", "z32"}, {"y14", XOR, "x14", "vvw"},
     {"bjt", XOR, "mmm", "z42"}, {"y41", AND, "x41", "gwr"},
@@ -213,71 +236,392 @@ std::vector<Gate> gates{
     {"y19", XOR, "x19", "wmp"}, {"wmp", AND, "mft", "ghg"},
 };
 
-decltype(data_real) data_test{};
-//    auto &data = data_test;
+constexpr ll INPUT_SIZE = 45;
+constexpr ll OUTPUT_SIZE = INPUT_SIZE + 1;
+
+using ull = unsigned ll;
+
+struct Context {
+  std::vector<Gate> _gates;
+  std::map<std::string, Gate> _output_map;
+
+  std::vector<std::string> _swaps;
+
+  ll _correct_bit = 0;
+  std::set<Gate> _correct_gates;
+
+  void init() {
+    _output_map.clear();
+
+    for (auto &gate : _gates) {
+      auto [it, inserted] =
+          _output_map.insert(std::make_pair(gate._output.begin()->first, gate));
+      assert(inserted);
+    }
+  }
+
+  ull calculate(ull _x, ull _y) {
+    std::bitset<64> x(_x), y(_y);
+
+    std::map<std::string, std::optional<ll>> data_ready;
+    for (auto i = 0; i < INPUT_SIZE; i++) {
+      std::ostringstream ss;
+      ss << "x" << std::setw(2) << std::setfill('0') << i;
+      data_ready[ss.str()] = x[i];
+    }
+    for (auto i = 0; i < INPUT_SIZE; i++) {
+      std::ostringstream ss;
+      ss << "y" << std::setw(2) << std::setfill('0') << i;
+      data_ready[ss.str()] = y[i];
+    }
+
+    for (auto &gate : _gates) {
+      gate._inputs.begin()->second = std::nullopt;
+      std::next(gate._inputs.begin())->second = std::nullopt;
+      gate._output.begin()->second = std::nullopt;
+    }
+
+    // for (auto& [key, value]: data_ready) {
+    //   std::cout << "{" << key << "," << *value << "} ";
+    // }
+    // std::cout << std::endl;
+
+    ll stuck_counter = 0;
+    std::vector<std::optional<ll>> Zs;
+    do {
+      Zs = std::vector<std::optional<ll>>(OUTPUT_SIZE, std::nullopt);
+      std::map<std::string, std::optional<ll>> new_data_ready;
+      for (auto &gate : _gates) {
+        for (auto &d : data_ready) {
+          gate.setInput(d);
+        }
+      }
+
+      for (auto &gate : _gates) {
+
+        if (gate.calculate()) {
+          auto &output = gate.getOutput();
+          new_data_ready.insert(output);
+          if (output.first.starts_with("z")) {
+            Zs.at(strtol(output.first.c_str() + 1, nullptr, 10)) =
+                *(output.second);
+          }
+        }
+      }
+
+      if (std::all_of(Zs.begin(), Zs.end(), [](const std::optional<ll> &z) {
+            return static_cast<bool>(z);
+          })) {
+        break;
+      }
+
+      if (new_data_ready == data_ready) {
+        ++stuck_counter;
+      } else {
+        stuck_counter = 0;
+      }
+
+      if (stuck_counter > 10) {
+        return INT64_MAX;
+      }
+
+      data_ready = std::move(new_data_ready);
+    } while (true);
+
+    std::bitset<OUTPUT_SIZE> result(0);
+    for (ll i = 0; i < Zs.size(); i++) {
+      result[i] = *Zs.at(i);
+    }
+
+    return result.to_ullong();
+  }
+
+  void print_dotty() const {
+
+    std::cout << "graph graphname {" << std::endl;
+    for (auto &gate : _gates) {
+      auto gate_id = std::to_string((uintptr_t)&gate);
+      std::cout << gate_id << "[label = " << op_to_string(gate._op)
+                << ", shape = box];" << std::endl;
+      std::cout << gate._inputs.begin()->first << " -- " << gate_id << ";"
+                << std::endl;
+      std::cout << std::next(gate._inputs.begin())->first << " -- " << gate_id
+                << ";" << std::endl;
+      std::cout << gate_id << " -- " << gate._output.begin()->first << ";"
+                << std::endl;
+    }
+    std::cout << "}" << std::endl;
+
+    // for (auto *gate : _Zs) {
+    //   if (gate->_op != XOR)
+    //     std::cout << gate->_output.begin()->first << " "
+    //               << op_to_string(gate->_op) << std::endl;
+    // }
+  }
+
+  std::set<Gate> get_involved_gates(const std::string &output) const {
+    std::set<Gate> involved_gates;
+    std::vector<std::string> queue{output};
+    do {
+      auto current = std::move(queue.back());
+      queue.pop_back();
+
+      auto current_it = _output_map.find(current);
+      if (current_it == _output_map.end()) {
+        assert(current.starts_with("x") || current.starts_with("y"));
+        continue;
+      }
+      auto current_gate = current_it->second;
+      involved_gates.insert(current_gate);
+
+      auto input0 = current_gate._inputs.begin()->first;
+      auto input1 = std::next(current_gate._inputs.begin())->first;
+
+      queue.push_back(std::move(input0));
+      queue.push_back(std::move(input1));
+
+    } while (!queue.empty());
+
+    return involved_gates;
+  }
+
+  Context swap_outputs(const std::string &o1, const std::string &o2) const {
+    Context new_context;
+    new_context._gates = _gates;
+    new_context._swaps = _swaps;
+    new_context._swaps.push_back(o1);
+    new_context._swaps.push_back(o2);
+
+    Gate *other_g1 = nullptr, *other_g2 = nullptr;
+    for (auto &other : new_context._gates) {
+      if (other._output.begin()->first == o1) {
+        other_g1 = &other;
+      } else if (other._output.begin()->first == o2) {
+        other_g2 = &other;
+      }
+      if (other_g1 && other_g2)
+        break;
+    }
+
+    if (!other_g1 || !other_g2) {
+      assert(false);
+    }
+
+    other_g1->_output = {{o2, std::nullopt}};
+    other_g2->_output = {{o1, std::nullopt}};
+
+    new_context.init();
+    return new_context;
+  }
+
+  bool check(ull input_bit, bool x_value, bool y_value, int mode) {
+    std::bitset<INPUT_SIZE> x(0), y(0);
+    if (mode == 0) {
+      x[input_bit] = x_value;
+      y[input_bit] = y_value;
+    } else if (mode == 1) {
+      for (ll i = 0; i <= input_bit; i++) {
+        x[i] = x_value;
+      }
+      for (ll i = 0; i <= input_bit; i++) {
+        y[i] = y_value;
+      }
+    } else if (mode == 2) {
+      bool x_flag = x_value;
+      for (ll i = 0; i <= input_bit; i++) {
+        x[i] = x_flag;
+        x_flag = !x_flag;
+      }
+      bool y_flag = y_value;
+      for (ll i = 0; i <= input_bit; i++) {
+        y[i] = y_flag;
+        y_flag = !y_flag;
+      }
+    } else {
+      assert(false);
+    }
+
+    auto r = calculate(x.to_ullong(), y.to_ullong());
+    auto valid = (x.to_ullong() + y.to_ullong() == r);
+    //  std::cout << x.to_ullong() << "\t+\t" << y.to_ullong() << "\t=\t"
+    //            << (ll)r << "\tvs\t"
+    //            << (x.to_ullong() + y.to_ullong()) << "\t" << valid <<
+    //            std::endl;
+
+    return valid;
+  }
+
+  bool check_i(ll i) {
+    std::vector<std::function<bool()>> checks{
+        [i, this]() { return check(i, false, false, 0); },
+        [i, this]() { return check(i, false, true, 0); },
+        [i, this]() { return check(i, true, false, 0); },
+        [i, this]() { return check(i, true, true, 0); },
+        [i, this]() { return check(i, false, true, 1); },
+        [i, this]() { return check(i, true, false, 1); },
+        [i, this]() { return check(i, true, true, 1); },
+        [i, this]() { return check(i, false, false, 2); },
+        [i, this]() { return check(i, false, true, 2); },
+        [i, this]() { return check(i, true, false, 2); },
+        [i, this]() { return check(i, true, true, 2); },
+
+    };
+    return std::all_of(checks.begin(), checks.end(),
+                       [](auto val) { return val(); });
+  }
+
+  bool check_0_i(ll i) {
+    for (ll j = 0; j <= i; j++) {
+      auto res = check_i(j);
+      if (!res)
+        return false;
+    }
+    return true;
+  }
+
+  void print_swaps() {
+    std::sort(_swaps.begin(), _swaps.end());
+    for (const auto &s : _swaps) {
+      std::cout << s << ",";
+    }
+    std::cout << std::endl;
+  }
+};
+
 auto &data = data_real;
+
 } // namespace
 
 int main() {
   int64_t result0 = 0;
   int64_t result1 = 0;
 
-  myprint(gates.size());
+  {
+    Context context;
+    context._gates = original_gates;
+    context.init();
+    std::bitset<INPUT_SIZE> x(0), y(0);
 
-  std::vector<Gate *> Zs;
-  for (auto &gate : gates) {
-    if (gate._output.begin()->first.starts_with("z")) {
-      Zs.push_back(&gate);
+    for (auto &[key, value] : data) {
+      auto index = strtoul(key.data() + 1, nullptr, 10);
+      if (key.starts_with("x")) {
+        x[index] = *value;
+      } else if (key.starts_with("y")) {
+        y[index] = *value;
+      } else {
+        assert(false);
+      }
     }
+
+    result0 = context.calculate(x.to_ullong(), y.to_ullong());
+    myprint(result0);
   }
 
-  myprint(Zs.size());
+  Context ctx;
+  ctx._gates = original_gates;
+  ctx.init();
+  std::vector<Context> queue = {ctx};
 
-  std::sort(Zs.begin(), Zs.end(), [](const Gate *first, const Gate *second) {
-    return first->_output.begin()->first > second->_output.begin()->first;
-  });
-
-  auto data_ready = data;
-  ll step = 0;
+  // This is a a DFS with some heuristics. It checks the gates only in a close
+  // range and awoids already validates gates. However it's still very slow. One
+  // of the improvements might be to start with the gates which
+  // 1. Output "zxx" & are not the last gate (?)
+  // 2. Have anything but XOR in it
   do {
-    ++step;
-    for (auto &gate : gates) {
-      for (auto &d : data_ready) {
-        gate.setInput(d);
-      }
-    }
-    data_ready.clear();
+    auto context = std::move(queue.back());
+    queue.pop_back();
 
-    for (auto &gate : gates) {
-
-      if (gate.calculate()) {
-        auto &output = gate.getOutput();
-        data_ready.insert(output);
-      }
+    if (context._correct_bit == INPUT_SIZE - 1) {
+      std::cout << "FINISH!!!!!" << std::endl;
+      context.print_swaps();
+      return 0;
     }
-    bool z_ready = true;
-    for (auto *gate : Zs) {
-      if (!gate->_output.begin()->second) {
-        z_ready = false;
+
+    for (ull i = context._correct_bit; i < INPUT_SIZE; i++) {
+      std::set<Gate> involved_gates_i = context.get_involved_gates(
+          (std::ostringstream()
+           << "z" << std::setw(2) << std::setfill('0') << (int)i)
+              .str());
+
+      if (context.check_0_i(i)) {
+        context._correct_gates.insert(involved_gates_i.begin(),
+                                      involved_gates_i.end());
+
+        if (i == INPUT_SIZE - 1) {
+          std::cout << "FINISH!!!!!" << std::endl;
+          context.print_swaps();
+          return 0;
+        }
+
+      } else {
+        std::cout << "ERROR on "
+                  << "x/y" << std::setw(2) << std::setfill('0') << (int)i
+                  << std::endl;
+        std::set<Gate> involved_gates_all;
+        ll min = std::max<ll>(0, i);
+        ll max = std::min<ll>(OUTPUT_SIZE - 1, i + 3);
+        for (auto j = min; j != max; j++) {
+          auto involved_gates_im1 = context.get_involved_gates(
+              (std::ostringstream()
+               << "z" << std::setw(2) << std::setfill('0') << (int)j)
+                  .str());
+          involved_gates_all.insert(involved_gates_im1.begin(),
+                                    involved_gates_im1.end());
+        }
+
+        std::set<Gate> questionable_gates_set;
+
+        std::set_difference(
+            involved_gates_all.begin(), involved_gates_all.end(),
+            context._correct_gates.begin(), context._correct_gates.end(),
+            std::inserter(questionable_gates_set,
+                          questionable_gates_set.end()));
+
+        std::vector<Gate> questionable_gates(questionable_gates_set.begin(),
+                                             questionable_gates_set.end());
+        for (auto &g : questionable_gates) {
+          std::cout << g.print() << " ";
+        }
+        std::cout << std::endl;
+
+        for (ll g1i = 0; g1i < questionable_gates.size() - 1; g1i++) {
+          for (ll g2i = g1i + 1; g2i < questionable_gates.size(); g2i++) {
+            auto &g1 = questionable_gates.at(g1i);
+            auto &g2 = questionable_gates.at(g2i);
+            std::cout << "swap " << g1.print() << " " << g2.print();
+
+            if (!context._swaps.empty()) {
+              std::cout << " existing swaps ";
+              context.print_swaps();
+            } else {
+              std::cout << std::endl;
+            }
+            auto o1 = g1._output.begin()->first;
+            auto o2 = g2._output.begin()->first;
+            auto new_context = context.swap_outputs(o1, o2);
+
+            if (new_context.check_0_i(i)) {
+              std::cout << "successfull swap " << g1.print() << " "
+                        << g2.print() << std::endl;
+              new_context._correct_bit = i;
+              for (auto j = 0; j <= i; j++) {
+                auto involved_gates_im1 = new_context.get_involved_gates(
+                    (std::ostringstream()
+                     << "z" << std::setw(2) << std::setfill('0') << (int)j)
+                        .str());
+                new_context._correct_gates.insert(involved_gates_im1.begin(),
+                                                  involved_gates_im1.end());
+              }
+              queue.push_back(std::move(new_context));
+            }
+          }
+        }
         break;
       }
     }
-    if (z_ready) {
-      break;
-    }
-  } while (true);
 
-  std::string result0_bin;
-  for (auto *g : Zs) {
-    // std::cout << g->_output.begin()->first << " : " <<
-    // *g->_output.begin()->second << std::endl;
-    result0_bin.append(std::to_string(*g->_output.begin()->second));
-  }
+  } while (!queue.empty());
 
-  myprint(result0_bin);
-  result0 = strtoul(result0_bin.c_str(), nullptr, 2);
-
-  myprint(result0);
   myprint(result1);
   return 0;
 }
