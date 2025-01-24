@@ -1,5 +1,7 @@
 #include <algorithm>
 #include <array>
+#include <bitset>
+#include <deque>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
@@ -47,7 +49,7 @@ std::array<ll, 3> registers_real{
 };
 
 decltype(input_real) input_test{0, 1, 5, 4, 3, 0};
-//    auto &input = input_test;
+//  auto &INPUT = input_test;
 auto &INPUT = input_real;
 
 decltype(registers_real) registers_test{
@@ -55,7 +57,7 @@ decltype(registers_real) registers_test{
     0,
     0,
 };
-//    auto &registers = registers_test;
+// auto &REGISTERS = registers_test;
 auto &REGISTERS = registers_real;
 
 ll interpret(ll opcode, ll operand, ll pc, std::vector<ll> &output,
@@ -120,6 +122,8 @@ ll interpret(ll opcode, ll operand, ll pc, std::vector<ll> &output,
   assert(false);
 }
 
+// Translate the given line into C++
+// Use static single assignment for optimization.
 void translate(ll line, ll opcode, ll operand, std::ostream &os,
                std::array<ll, 3> &ssa) {
 
@@ -175,7 +179,7 @@ void translate(ll line, ll opcode, ll operand, std::ostream &os,
   }
   case 2: {
     std::ostringstream s;
-    s << " = " << combo() << " & 0000 0111" << std::endl;
+    s << " = " << combo() << " & 7ULL" << std::endl;
     os << line << ":\t " << SSA_ASSIGN(B) << s.str();
     return;
   }
@@ -192,7 +196,7 @@ void translate(ll line, ll opcode, ll operand, std::ostream &os,
     return;
   }
   case 5: {
-    os << line << ":\t print(" << combo() << " & 0000 0111)" << std::endl;
+    os << line << ":\t print(" << combo() << " & 7ULL)" << std::endl;
     return;
   }
   case 6: {
@@ -211,8 +215,9 @@ void translate(ll line, ll opcode, ll operand, std::ostream &os,
   assert(false);
 }
 
-std::vector<ll> run(const std::vector<ll> &input, std::array<ll, 3> registers) {
-
+// Run interpreted
+std::vector<ll> run_i(const std::vector<ll> &input,
+                      std::array<ll, 3> registers) {
   std::vector<ll> output;
   ll pc = 0;
   while (pc < input.size()) {
@@ -223,6 +228,17 @@ std::vector<ll> run(const std::vector<ll> &input, std::array<ll, 3> registers) {
   return output;
 }
 
+// Run compiled
+void run_c(ll a, std::vector<ll> &output) {
+  output.clear();
+  while (a != 0) {
+    auto b = (((a & 7ULL) ^ 1) ^ 5) ^ (a >> ((a & 7ULL) ^ 1));
+    output.push_back(b & 7ULL);
+    a = a >> 3;
+  }
+}
+
+// Translate code into C++
 void translate(const std::vector<ll> &input) {
   std::array<ll, 3> ssa{0, 0, 0};
   ll i = 0;
@@ -234,28 +250,11 @@ void translate(const std::vector<ll> &input) {
   } while (i < input.size());
 }
 
-std::vector<ll> run(const std::vector<ll> &input, std::array<ll, 3> registers,
-                    const std::vector<ll> &reference_output) {
-  std::vector<ll> output;
-  ll pc = 0;
-  auto a = registers[A];
-  while (pc < input.size()) {
-    ll opcode = input.at(pc);
-    ll operand = input.at(pc + 1);
-    pc = interpret(opcode, operand, pc, output, registers);
-    if (!output.empty()) {
-      if (output.size() > reference_output.size()) {
-        return {};
-      }
-      if (!std::equal(output.begin(), output.end(), reference_output.begin())) {
-        return {};
-      }
-    }
-  }
-  return output;
-}
-
 void print(const std::vector<ll> &output) {
+  if (output.empty()) {
+    std::cout << "<EMPTY>" << std::endl;
+    return;
+  }
   std::copy(output.begin(), std::prev(output.end()),
             std::ostream_iterator<ll>(std::cout, ","));
   std::cout << output.back() << std::endl;
@@ -263,26 +262,109 @@ void print(const std::vector<ll> &output) {
 
 } // namespace
 
-int main17() {
+int main() {
 
-  print(run(INPUT, REGISTERS));
+  std::vector<ll> output;
+  print(run_i(INPUT, REGISTERS));
+  run_c(REGISTERS[A], output);
+  print(output);
 
   translate(INPUT);
 
-  ll new_A = (1ULL << (3 * (INPUT.size() - 1))) - 1;
-  myprint(new_A);
+  struct Q {
+    std::deque<bool> test_bits;
+    uint64_t test_value = 0;
+    void add(ll bits) {
+      while (bits) {
+        test_bits.push_back(bits & 1 == 1);
+        bits = bits >> 1;
+      }
 
-  while (true) {
-    auto registers = REGISTERS;
-    registers[A] = new_A;
-
-    auto output = run(INPUT, registers, INPUT);
-    if (output == INPUT) {
-      myprint(new_A);
-      return 0;
+      std::bitset<64> value;
+      for (ll i = 0; i < test_bits.size(); i++) {
+        value[i] = test_bits[i];
+      }
+      test_value = value.to_ullong();
     }
-    ++new_A;
+
+    std::vector<ll> run_I() {
+      std::array<ll, 3UL> r;
+      r.at(A) = test_value;
+      r.at(B) = 0;
+      r.at(C) = 0;
+      auto output = run_i(INPUT, r);
+      return output;
+    }
+
+    std::vector<ll> run_C() {
+      std::vector<ll> output;
+      run_c(test_value, output);
+      return output;
+    }
+  };
+  std::vector<Q> queue;
+
+  // start test value with max 10 bits
+  {
+    ll max = (1 << 10) - 1;
+    while (max > 0) {
+      Q q;
+      q.add(max);
+      queue.push_back(q);
+      max--;
+    }
   }
+
+  std::vector<Q> results;
+  std::set<ll> checked;
+
+  do {
+    auto current = queue.back();
+    queue.pop_back();
+    auto [it, is_new] = checked.insert(current.test_value);
+    if (!is_new)
+      continue;
+
+    auto output = current.run_C();
+
+    if (output == INPUT) {
+      results.push_back(current);
+      myprint(current.test_value);
+      continue;
+    }
+
+    if (output.size() > INPUT.size()) {
+      continue;
+    }
+
+    // Since we XOR with more significant bits, we cannot compare
+    // the whole output. Let's say all but 2 last output digits
+    // must match.
+    if (output.size() < 2)
+      continue;
+    auto one_before_last = std::next(output.begin(), output.size() - 2);
+    if (!std::equal(output.begin(), one_before_last, INPUT.begin())) {
+      continue;
+    }
+
+    // Add up to 7 next bits
+    // The more bits we add the more redundant results will be generated
+    ll max = (1 << 7) - 1;
+    while (max > 0) {
+      auto next_q = current;
+      next_q.add(max);
+      queue.push_back(next_q);
+      max--;
+    }
+
+  } while (!queue.empty());
+  myprint(checked.size());
+
+  uint64_t min_result = -1;
+  for (auto &q : results) {
+    min_result = std::min(min_result, q.test_value);
+  }
+  myprint(min_result);
 
   return 0;
 }
